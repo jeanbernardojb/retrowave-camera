@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<meta name="description" content="Editor de fotos com estilos analógicos.">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<title>RetroWave Camera</title>
+<style>
+:root{color-scheme:dark;--bg:#111;--panel:#202020;--text:#f5f0e8;--muted:#aaa;--accent:#d9a76c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:560px;margin:auto;padding:calc(20px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom))}
+header{display:flex;justify-content:space-between;align-items:center}h1{font-size:22px;letter-spacing:3px;margin:0}.sub{font-size:12px;color:var(--muted);letter-spacing:1px;margin-top:7px}
+.status{font-size:11px;color:var(--accent);border:1px solid #5d4934;padding:6px 8px;border-radius:20px}
+label{display:block;color:#ccc;font-size:12px;letter-spacing:1px;margin:20px 0 9px}
+input[type=file]{width:100%;font-size:14px;color:#ccc}
+.preview{background:#222;border:1px solid #333;border-radius:16px;min-height:280px;display:grid;place-items:center;overflow:hidden;margin:18px 0;position:relative}
+#photo{display:none;width:100%;max-height:62vh;object-fit:contain}
+#empty{color:#aaa;padding:24px;text-align:center;line-height:1.6}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{padding:14px 8px;border:1px solid #4b4b4b;border-radius:12px;background:var(--panel);color:white;font-size:14px;cursor:pointer}
+button.active{border-color:var(--accent);color:#ffd5a0;background:#30271e}
+.actions{display:flex;gap:10px;margin-top:14px}.actions button{flex:1}
+input[type=range]{width:100%;accent-color:var(--accent)}
+footer{font-size:11px;color:#888;line-height:1.5;margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+<header><div><h1>RETROWAVE</h1><div class="sub">ANALOG PHOTO LAB · 001</div></div><span class="status" id="net">PRONTO</span></header>
+<label for="file">ESCOLHER FOTOGRAFIA</label>
+<input id="file" type="file" accept="image/*">
+<div class="preview"><div id="empty">Sua fotografia aparecerá aqui.<br>Escolha uma imagem para começar.</div><img id="photo" alt="Prévia da fotografia"></div>
+<div class="filters">
+<button data-filter="original" class="active">01 · Original</button>
+<button data-filter="warm">02 · Golden Film</button>
+<button data-filter="fade">03 · Faded 90s</button>
+<button data-filter="mono">04 · Monochrome</button>
+<button data-filter="cool">05 · Cool Chrome</button>
+<button data-filter="vintage">06 · Vintage</button>
+</div>
+<label for="intensity">INTENSIDADE <span id="value">100%</span></label>
+<input id="intensity" type="range" min="0" max="100" value="100">
+<div class="actions"><button id="reset">Redefinir</button><button id="save">Exportar JPEG</button></div>
+<footer>As imagens são processadas localmente nesta página. Este protótipo não envia suas fotos para um servidor. Para melhores resultados, mantenha a página hospedada em HTTPS.</footer>
+</main>
+<script>
+const file=document.querySelector('#file'),photo=document.querySelector('#photo'),empty=document.querySelector('#empty'),intensity=document.querySelector('#intensity'),value=document.querySelector('#value');
+let source=null,preset='original';
+const styles={original:{c:100,s:100,sep:0,hue:0,gray:0},warm:{c:108,s:112,sep:22,hue:0,gray:0},fade:{c:88,s:82,sep:8,hue:0,gray:0},mono:{c:112,s:0,sep:0,hue:0,gray:1},cool:{c:108,s:108,sep:0,hue:190,gray:0},vintage:{c:96,s:86,sep:30,hue:0,gray:0}};
+function filterString(){const f=styles[preset],k=Number(intensity.value)/100;return `contrast(${100+(f.c-100)*k}%) saturate(${100+(f.s-100)*k}%) sepia(${f.sep*k}%) hue-rotate(${f.hue*k}deg) grayscale(${f.gray*k*100}%)`}
+function update(){photo.style.filter=filterString();value.textContent=intensity.value+'%'}
+file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(!f)return;if(source)URL.revokeObjectURL(source);source=URL.createObjectURL(f);photo.onload=()=>{photo.style.display='block';empty.style.display='none';update()};photo.src=source});
+document.querySelectorAll('[data-filter]').forEach(btn=>btn.addEventListener('click',()=>{preset=btn.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b===btn));update()}));
+intensity.addEventListener('input',update);
+document.querySelector('#reset').addEventListener('click',()=>{preset='original';intensity.value=100;document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='original'));update()});
+document.querySelector('#save').addEventListener('click',()=>{if(!photo.naturalWidth){alert('Escolha uma foto primeiro.');return}const canvas=document.createElement('canvas');canvas.width=photo.naturalWidth;canvas.height=photo.naturalHeight;const ctx=canvas.getContext('2d');ctx.filter=filterString();ctx.drawImage(photo,0,0);canvas.toBlob(blob=>{if(!blob){alert('Não foi possível exportar.');return}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='retrowave.jpg';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)},'image/jpeg',.94)});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
+window.addEventListener('online',()=>document.querySelector('#net').textContent='ONLINE');window.addEventListener('offline',()=>document.querySelector('#net').textContent='OFFLINE');if(!navigator.onLine)document.querySelector('#net').textContent='OFFLINE';
+</script>
+</body></html>
